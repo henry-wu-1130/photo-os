@@ -1,248 +1,343 @@
 # photo-os
 
-A CLI that orchestrates the photography workflow for Sony A7C II shooters on macOS.
-
----
-
-## Philosophy
+A lightweight CLI that orchestrates a modern photography workflow using digiKam and darktable.
 
 photo-os is not a photo editor. It is not a photo manager.
 
-It is a workflow orchestrator — a thin layer that connects the tools you already use and automates the parts that are repetitive and mechanical.
+It connects open-source tools into a single, repeatable workflow — handling the mechanical parts (import, folder structure, batch export) so you can focus on shooting and editing.
 
-Each tool in the stack has exactly one responsibility:
+---
 
-| Tool | Responsibility |
-|------|---------------|
-| **photo-os** | Session management, import, export orchestration |
-| **digiKam** | Browse, rate, cull |
-| **darktable** | RAW editing, XMP sidecars |
-| **darktable-cli** | Batch JPEG export |
+## Features
 
-No tool reaches into another tool's domain.
+- Auto-detect camera SD cards and import RAW files
+- Automatic session creation with date-stamped folder structure
+- Current Session — every command knows where you are in the workflow
+- Batch export via `darktable-cli` — no GUI interaction required
+- Open session folders in Finder with a single command
+- Reproducible workflow: the same RAW + XMP always produces the same JPEG
+- macOS-first, POSIX shell, no external dependencies beyond rsync
+
+---
+
+## Requirements
+
+photo-os works together with two external tools. Install both before getting started.
+
+### digiKam
+
+[digiKam](https://www.digikam.org/) is used for browsing, rating, and culling RAW files.
+
+**Install:** Download from [digikam.org](https://www.digikam.org/)
+
+**Setup:**
+
+1. Open digiKam → **Settings → Configure digiKam → Collections**
+2. Add a collection pointing to `~/Photography/RAW`
+
+Keep digiKam focused on RAW files only. Do not add `Export/` or `Portfolio/` as collections.
+
+**Responsibilities in this workflow:**
+
+- Browse the session after import
+- Rate images (1–5 stars)
+- Cull — reject technically broken shots before editing
+
+### darktable
+
+[darktable](https://www.darktable.org/) is used for RAW editing. All edits are saved to `.xmp` sidecar files. RAW files are never modified.
+
+**Install:** Download from [darktable.org](https://www.darktable.org/)
+
+**darktable-cli:** On macOS, `darktable-cli` is bundled with darktable but not added to `PATH` automatically. photo-os looks for it here:
+
+```
+/Applications/darktable.app/Contents/MacOS/darktable-cli
+```
+
+If you have a custom install, add `darktable-cli` to your `PATH` and photo-os will find it.
+
+**Responsibilities in this workflow:**
+
+- Edit RAW files in the darkroom
+- Save edits as `.xmp` sidecar files
+- Do **not** export from the darktable GUI — use `photo export` instead
 
 ---
 
 ## Workflow
 
 ```
-Shoot → Import → Cull → Edit → Export → Portfolio
+Shoot
+  ↓
+photo import
+  ↓
+digiKam
+  Browse · Rate · Cull
+  ↓
+darktable
+  Edit RAW · Save XMP
+  ↓
+photo export web
+  or
+photo export print
+  ↓
+Export/<session>/web/
+  ↓
+Manual review
+  ↓
+Portfolio/
+  ↓
+Instagram · Print
 ```
 
-### 1. Shoot
+**Shoot** — Capture RAW files on the Sony A7C II. Files are stored as `.ARW` on the memory card.
 
-Shoot with the Sony A7C II. RAW files (`.ARW`) are written to the memory card.
+**Import** — Insert the SD card and run `photo import`. photo-os auto-detects the card, prompts for a project name, creates the session folders, copies the RAW files, and remembers the session as the Current Session.
 
-### 2. Import
+**Cull** — Open the session in digiKam. Reject technically broken shots. Rate the rest 1–5 stars.
+
+**Edit** — Open the rated images in darktable. Edit normally. Save edits to `.xmp` sidecars. Do not export from darktable's GUI.
+
+**Export** — Run `photo export web` or `photo export print`. photo-os calls `darktable-cli` to batch export every RAW file in the session. Edits from `.xmp` sidecars are applied automatically.
+
+**Portfolio** — Open the export folder in Finder (`photo open export`), review the JPEGs, and manually move the best images into `Portfolio/`. This step is intentionally manual — photo-os does not decide what belongs in your portfolio.
+
+---
+
+## Installation
+
+```sh
+# 1. Clone the repository
+git clone https://github.com/henry-wu-1130/photo-os.git ~/photo-os
+
+# 2. Create a symlink to make the CLI available system-wide
+ln -sf ~/photo-os/scripts/photo /usr/local/bin/photo
+
+# 3. Verify
+photo help
+```
+
+`/usr/local/bin` must be in your `PATH`. On a standard macOS installation, it is.
+
+---
+
+## Quick Start
+
+### Import a shoot
+
+Insert the camera SD card, then:
 
 ```sh
 photo import
 ```
 
-Auto-detects the SD card. Prompts for a project name. The date is added automatically.
+photo-os will:
 
-Creates the full session structure and remembers it as the **current session**:
+1. Scan `/Volumes` for a directory containing `DCIM/` — the standard camera card indicator
+2. Prompt for a project name (date is added automatically)
+3. Create the session folder structure
+4. Copy all `.ARW` files with checksum verification
+5. Copy `session-notes.md` template into the RAW folder
+6. Remember this as the **Current Session**
+7. Eject the SD card
+
+Example output:
 
 ```
-RAW/2026/2026-07-08 Taipei Blue Hour/
-Export/2026-07-08 Taipei Blue Hour/web/
-Export/2026-07-08 Taipei Blue Hour/print/
-Portfolio/2026-07-08 Taipei Blue Hour/
+✓ Camera card detected
+  Source: /Volumes/Untitled
+
+Project name: Taipei Blue Hour
+
+✓ RAW:       ~/Photography/RAW/2026/2026-07-08 Taipei Blue Hour
+✓ Export:    ~/Photography/Export/2026-07-08 Taipei Blue Hour (web/ print/)
+✓ Portfolio: ~/Photography/Portfolio/2026-07-08 Taipei Blue Hour
+✓ Current:   2026-07-08 Taipei Blue Hour
+
+Copying 24 .ARW file(s)...
+✓ Import complete: 24 / 24 file(s)
 ```
 
-### 3. Cull
-
-Open the session in **digiKam**. Browse, rate, and cull.
-
-- Reject technically broken shots.
-- Rate the rest 1–5 stars.
-- ★5 = best of the session.
-
-### 4. Edit
-
-Open the rated images in **darktable**. Edit RAW files. Save edits to `.xmp` sidecars.
-
-RAW files are never modified. All edits live in `.xmp`.
-
-### 5. Export
+### Check the current session
 
 ```sh
-photo export web      # → Export/<session>/web/
-photo export print    # → Export/<session>/print/
+photo current
 ```
 
-photo-os calls `darktable-cli` to batch export every RAW file in the session. If an `.xmp` sidecar exists, darktable-cli applies the full edit history automatically. No GUI interaction required.
+```
+Session:   2026-07-08 Taipei Blue Hour
 
-### 6. Portfolio
+RAW:       ~/Photography/RAW/2026/2026-07-08 Taipei Blue Hour
+Export:    ~/Photography/Export/2026-07-08 Taipei Blue Hour
+Portfolio: ~/Photography/Portfolio/2026-07-08 Taipei Blue Hour
+```
+
+### Review and cull in digiKam
+
+Open the RAW folder:
+
+```sh
+photo open raw
+```
+
+Browse, rate, and reject in digiKam. Ratings are written to `.xmp` sidecar files.
+
+### Edit in darktable
+
+Open images in darktable. Edit normally. Save — edits go to `.xmp`. Do not use darktable's Export dialog.
+
+### Batch export
+
+```sh
+photo export web
+```
+
+```
+Current Session
+
+  2026-07-08 Taipei Blue Hour
+
+Found
+
+  24 RAW file(s)
+
+Export target
+
+  ~/Photography/Export/2026-07-08 Taipei Blue Hour/web
+
+Exporting...
+
+████████████████████  24 / 24
+
+Done.
+
+  24 image(s) → .../web
+```
+
+For print-resolution JPEGs:
+
+```sh
+photo export print
+```
+
+Preview without exporting:
+
+```sh
+photo export web --dry-run
+```
+
+### Review and curate
 
 ```sh
 photo open export     # opens Export/<session>/web/ in Finder
 ```
 
-Review the exported JPEGs. Manually copy the best images into `Portfolio/`.
-
-Portfolio is intentionally manual. photo-os does not decide what belongs there.
+Manually copy the best images into `Portfolio/<session>/`.
 
 ---
 
 ## Folder Structure
 
-### Photo Library (`~/Photography/`)
-
 ```
-Photography/
+~/Photography/
 ├── RAW/
 │   └── YYYY/
-│       └── YYYY-MM-DD Project/         ← one folder per session
+│       └── YYYY-MM-DD Project/
 │           ├── DSC00001.ARW
-│           └── DSC00001.ARW.xmp        ← darktable edit history
+│           └── DSC00001.ARW.xmp
 ├── Export/
 │   └── YYYY-MM-DD Project/
-│       ├── web/                         ← 1920px, sRGB, JPEG
-│       └── print/                       ← full res, AdobeRGB, JPEG
+│       ├── web/
+│       └── print/
 └── Portfolio/
-    └── YYYY-MM-DD Project/              ← manually curated final selects
+    └── YYYY-MM-DD Project/
 ```
 
-| Folder | Role |
-|--------|------|
+| Folder | Purpose |
+|--------|---------|
 | `RAW/` | Permanent archive. Source of truth. Never delete. |
-| `Export/` | Reproducible JPEG artifacts. Generated from RAW + XMP. |
-| `Portfolio/` | Curated final work. Manually maintained. |
+| `Export/` | Generated JPEGs. Can be regenerated from RAW + XMP at any time. |
+| `Portfolio/` | Manually curated final work. |
 
-**RAW + XMP are the source of truth.** Exports can always be regenerated.
-
-### Repository (`~/photo-os/`)
-
-```
-photo-os/
-├── scripts/
-│   ├── photo               ← CLI entry point
-│   ├── lib/common.sh       ← shared utilities
-│   └── commands/           ← one file per subcommand
-├── presets/darktable/      ← .dtstyle files and export preset specs
-├── templates/              ← session-notes.md template
-└── docs/                   ← workflow documentation
-```
+Session folders are named `YYYY-MM-DD Project` — sortable by date, readable without parsing.
 
 ---
 
 ## CLI Reference
 
-### Session
+### Session management
 
-```sh
-photo import                              # auto-detect SD card, import, set session
-photo new "2026-07-08 Taipei Blue Hour"   # create session manually
-photo current                             # show RAW, Export, Portfolio paths
-photo open raw                            # open RAW folder in Finder
-photo open export                         # open Export/web/ in Finder
-photo open portfolio                      # open Portfolio folder in Finder
-photo export-path                         # print web export path (for darktable GUI)
-```
+| Command | Description |
+|---------|-------------|
+| `photo import` | Auto-detect SD card, import RAW files, set Current Session |
+| `photo new "YYYY-MM-DD Project"` | Create a session manually and set it as current |
+| `photo current` | Show RAW, Export, and Portfolio paths for the current session |
+| `photo open raw` | Open the RAW folder in Finder |
+| `photo open export` | Open `Export/<session>/web/` in Finder |
+| `photo open portfolio` | Open the Portfolio folder in Finder |
+| `photo export-path` | Print the web export path (for pasting into darktable) |
 
 ### Export
 
-```sh
-photo export web       # batch export all RAW → Export/<session>/web/
-photo export print     # batch export all RAW → Export/<session>/print/
-photo export web --dry-run   # preview without exporting
-```
+| Command | Description |
+|---------|-------------|
+| `photo export web` | Batch export all RAW → `Export/<session>/web/` |
+| `photo export print` | Batch export all RAW → `Export/<session>/print/` |
+| `photo export web --dry-run` | Preview which files would be exported |
 
-Export is performed by `darktable-cli`. No darktable GUI automation. No rating filter — export everything in the session. Cull in digiKam before exporting.
+Export settings:
+
+| Preset | Color profile | Max size |
+|--------|--------------|----------|
+| `web` | sRGB | 1920 × 1920 px |
+| `print` | AdobeRGB | Full resolution |
 
 ### Library
 
-```sh
-photo backup     # sync RAW and Export to backup destinations
-photo status     # library summary
-```
+| Command | Description |
+|---------|-------------|
+| `photo backup` | Sync RAW and Export to backup destinations |
+| `photo status` | Show library summary (sessions, file counts, last backup) |
 
 ---
 
-## Getting Started
+## Philosophy
 
-**Requirements:** macOS, `rsync`, [darktable](https://www.darktable.org/), [digiKam](https://www.digikam.org/).
+> One tool, one responsibility.
 
-```sh
-# 1. Clone
-git clone https://github.com/henry-wu-1130/photo-os ~/photo-os
+| Tool | Responsibility |
+|------|---------------|
+| photo-os | Workflow orchestration |
+| digiKam | Photo management |
+| darktable | RAW editing |
+| darktable-cli | Batch export |
 
-# 2. Install the CLI
-ln -sf ~/photo-os/scripts/photo /usr/local/bin/photo
+**Automation should remove repetitive work, not creative decisions.**
 
-# 3. Import from memory card
-photo import
-# auto-detects SD card → prompts: Project name: Taipei Blue Hour
-# creates: RAW/2026/2026-07-08 Taipei Blue Hour/ + Export/ + Portfolio/
-
-# 4. After culling in digiKam and editing in darktable:
-photo export web
-
-# 5. Review exports in Finder
-photo open export
-
-# 6. Backup
-photo backup
-```
-
----
-
-## darktable Integration
-
-darktable owns **editing only**. It writes edits to `.xmp` sidecar files.
-
-`photo export` calls `darktable-cli` — the headless darktable CLI — to batch export without opening the GUI:
-
-| Preset | Color profile | Max size | Output |
-|--------|--------------|----------|--------|
-| `web` | sRGB | 1920 × 1920 px | `Export/<session>/web/` |
-| `print` | AdobeRGB | Full resolution | `Export/<session>/print/` |
-
-darktable-cli automatically picks up the `.xmp` sidecar alongside each `.ARW`. No manual selection required.
-
-See [docs/darktable.md](docs/darktable.md) for editing workflow and style conventions.
-
----
-
-## digiKam Integration
-
-digiKam owns **browse, rate, and cull**. It reads and writes `xmp:Rating` to `.xmp` sidecar files, shared with darktable.
-
-Recommended workflow after import:
-1. Open the session album in digiKam.
-2. Reject technically broken shots.
-3. Rate the rest 1–5 stars.
-4. Edit the rated images in darktable.
-
-Culling in digiKam reduces what gets edited. Everything remaining in the RAW folder gets exported by `photo export`.
-
-See [docs/digikam.md](docs/digikam.md) for setup and keyboard shortcuts.
-
----
-
-## Principles
-
-- **Keep It Simple** — one tool, one responsibility
-- **RAW is the source of truth** — never modify, never delete
-- **XMP stores all edit history** — sidecars, not proprietary databases
-- **JPEGs are reproducible artifacts** — regenerable from RAW + XMP at any time
-- **Current Session is the foundation** — every command derives paths from it
-- **Automation removes repetitive work, not creative decisions** — you decide what to keep and what to publish
-- **Long-term maintainability** — standard tools, plain files, no vendor lock-in
+photo-os handles the mechanical steps — copying files, creating folders, running export commands. You make every creative decision: what to shoot, what to keep, what to publish.
 
 ---
 
 ## Roadmap
 
-| Version | Status | Focus |
-|---------|--------|-------|
-| v0.1 | ✓ Done | Documentation, folder conventions |
-| v0.2 | ✓ Done | `photo import`, `photo new`, `photo backup`, `photo status` |
-| v0.2.x | ✓ Done | Current session, `photo current`, `photo open`, `photo export-path` |
-| v0.3 | ✓ Done | `photo export web/print` via `darktable-cli` |
-| v0.4 | Planned | `photo doctor`, `photo stats`, backup improvements |
-| v1.0 | Planned | Hardened, fully tested, onboarding in under 30 minutes |
+### Current
+
+- `photo import` — SD card auto-detection, session creation, RAW import
+- `photo new` — manual session creation
+- `photo current` — current session paths
+- `photo open` — open session folders in Finder
+- `photo export web/print` — batch export via `darktable-cli`
+- `photo backup` — rsync to backup destinations
+- `photo status` — library summary
+
+### Future
+
+- `photo doctor` — check dependencies and configuration health
+- `photo stats` — shooting statistics (sessions, file counts, gear usage)
+- `photo backup` improvements — cloud sync, verification reports
+- Native GUI built on top of the CLI
+- Drag-and-drop workflow
 
 ---
 
@@ -250,8 +345,7 @@ See [docs/digikam.md](docs/digikam.md) for setup and keyboard shortcuts.
 
 - [docs/workflow.md](docs/workflow.md) — stage-by-stage workflow
 - [docs/darktable.md](docs/darktable.md) — darktable editing and export
-- [docs/digikam.md](docs/digikam.md) — digiKam culling and rating
+- [docs/digikam.md](docs/digikam.md) — digiKam setup, rating, and culling
 - [docs/portfolio.md](docs/portfolio.md) — portfolio curation SOP
 - [docs/scripts.md](docs/scripts.md) — CLI reference
-- [docs/folder-convention.md](docs/folder-convention.md) — naming rules
-- [docs/roadmap.md](docs/roadmap.md) — versioned roadmap
+- [docs/roadmap.md](docs/roadmap.md) — detailed version history
