@@ -4,7 +4,21 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve the real location of this script, following symlinks.
+# macOS readlink does not support -f, so we walk the chain manually.
+_real_dir() {
+    target="$1"
+    while [ -L "$target" ]; do
+        link="$(readlink "$target")"
+        case "$link" in
+            /*) target="$link" ;;                                   # absolute symlink
+            *)  target="$(dirname "$target")/$link" ;;             # relative symlink
+        esac
+    done
+    cd "$(dirname "$target")" && pwd
+}
+
+SCRIPT_DIR="$(_real_dir "$0")"
 LIB_DIR="$SCRIPT_DIR/lib"
 CMD_DIR="$SCRIPT_DIR/commands"
 
