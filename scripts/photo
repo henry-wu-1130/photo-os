@@ -1,0 +1,58 @@
+#!/bin/sh
+# photo - main CLI entry point for photo-os workflow
+# Usage: photo <command> [arguments]
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/lib"
+CMD_DIR="$SCRIPT_DIR/commands"
+
+# Load shared library
+. "$LIB_DIR/common.sh"
+
+# Ensure config exists
+config_init
+
+COMMAND="${1:-help}"
+shift 2>/dev/null || true
+
+case "$COMMAND" in
+    new)      . "$CMD_DIR/new.sh"    && cmd_new "$@" ;;
+    import)   . "$CMD_DIR/import.sh" && cmd_import "$@" ;;
+    export)   . "$CMD_DIR/export.sh" && cmd_export "$@" ;;
+    backup)   . "$CMD_DIR/backup.sh" && cmd_backup "$@" ;;
+    review)   . "$CMD_DIR/review.sh" && cmd_review "$@" ;;
+    status)   . "$CMD_DIR/status.sh" && cmd_status "$@" ;;
+    help|-h|--help)
+        cat <<EOF
+photo - photo-os workflow CLI
+
+Usage: photo <command> [arguments]
+
+Commands:
+  new      <"YYYY-MM-DD Location Theme">   Create a new session folder
+  import   <source_path> [--session NAME]  Import RAW files from memory card
+  export   <"YYYY-MM-DD Location Theme">   Export edited images to JPEG
+  backup   [--dest primary|secondary|all]  Sync library to backup destinations
+  review   <"YYYY-MM-DD Location Theme">   Open export folder in Finder
+  status                                   Show library summary
+  help                                     Show this message
+
+Examples:
+  photo new "2025-06-15 Tokyo Street"
+  photo import /Volumes/MEMORY_CARD
+  photo export "2025-06-15 Tokyo Street" --preset web
+  photo backup
+  photo review "2025-06-15 Tokyo Street"
+
+Config: ~/.photo-os/config
+Docs:   https://github.com/YOUR_USERNAME/photo-os
+EOF
+        ;;
+    *)
+        log_error "Unknown command: $COMMAND"
+        log_info  "Run 'photo help' for usage."
+        exit 1
+        ;;
+esac
