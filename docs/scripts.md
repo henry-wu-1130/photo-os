@@ -58,15 +58,38 @@ photo import /Volumes/MEMORY_CARD --session "2025-06-15 Tokyo Street"
 
 **What it does:**
 1. Lists `.ARW` files on the source.
-2. Prompts for session name if not provided.
-3. Creates session folder via `photo new` if it doesn't exist.
-4. Copies files using `rsync --checksum`.
+2. Resolves the session name:
+   - If `--session` is given, uses it directly.
+   - If a session already exists for today, asks whether to reuse it.
+   - If multiple sessions exist for today, lists them and lets the user pick.
+   - Otherwise, prompts for a **project name only** — the date is added automatically.
+3. Creates the full session structure via `photo new` if it doesn't exist.
+4. Copies files using `rsync --checksum --ignore-existing`.
 5. Verifies copy count matches source count.
 6. Logs import summary to `~/.photo-os/import.log`.
+7. Ejects the memory card if source is under `/Volumes/`.
+
+**Interactive example (no existing session):**
+```
+[photo] Found 127 .ARW file(s) in /Volumes/MEMORY_CARD
+[photo] Project name: Taipei Blue Hour
+[photo] ✓ RAW:       ~/Photography/RAW/2026/2026-07-08 Taipei Blue Hour
+[photo] ✓ Export:    ~/Photography/Export/2026-07-08 Taipei Blue Hour (web/ print/)
+[photo] ✓ Portfolio: ~/Photography/Portfolio/2026-07-08 Taipei Blue Hour
+[photo] Copying to .../2026-07-08 Taipei Blue Hour ...
+[photo] ✓ Import complete: 127 / 127 file(s)
+```
+
+**Interactive example (session already exists for today):**
+```
+[photo] Found 43 .ARW file(s) in /Volumes/MEMORY_CARD
+[photo] Existing session for today: 2026-07-08 Taipei Blue Hour
+[photo] Reuse it? [Y/n]
+```
 
 **Flags:**
-- `--session` — specify session name (skip prompt)
-- `--dry-run` — show what would be copied without copying
+- `--session` — bypass prompts; use this exact session name
+- `--dry-run` — show what would happen without copying anything
 - `--no-eject` — skip ejecting the memory card after import
 
 ---
