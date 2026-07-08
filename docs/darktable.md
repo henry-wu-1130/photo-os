@@ -104,47 +104,42 @@ Style files (`.dtstyle`) in this repository can be imported on a new machine to 
 
 ## Export
 
-Export is performed manually via the darktable GUI. photo-os provides the destination path.
+darktable's role in export is **applying edits and rendering the JPEG**. Deciding *which* images to export and *where* they go is photo-os's responsibility.
 
-### Step-by-step
+### Automated export (recommended)
 
 ```sh
-# 1. Get the destination path
+photo export web
+```
+
+This calls `darktable-cli` for every image in the current session that is rated ★5 in digiKam. The JPEG is written to `Export/<session>/web/`. No darktable GUI required.
+
+```sh
+photo export print          # full-res, AdobeRGB
+photo export web --rating 4 # include ★4 candidates too
+photo export web --dry-run  # preview without exporting
+```
+
+See [docs/scripts.md](scripts.md) for the full `photo export` reference.
+
+### Manual export (fallback)
+
+If you need to export from the darktable GUI:
+
+```sh
 photo export-path
 # → /Users/you/Photography/Export/2026-07-08 Taipei Blue Hour/web
 ```
 
-2. In darktable lighttable, select all ★4+ images.
-3. Open the **Export** panel (bottom right).
-4. Set **Destination folder** to the path from step 1.
-5. Select a preset and click **Export**.
+Paste that path into darktable's **Export** destination field. This is useful for one-off exports or when you want to use darktable's export presets directly.
 
-### Export Presets
+### darktable-cli
 
-Configure these once in darktable and save them by name:
+`photo export` uses `darktable-cli` with the following parameters:
 
-| Preset name | Format | Size | Color profile | Quality |
-|-------------|--------|------|---------------|---------|
-| `photo-os web` | JPEG | 1080px long edge | sRGB | 90% |
-| `photo-os print` | JPEG | Full resolution | AdobeRGB | 95% |
-| `photo-os instagram` | JPEG | 1080 × 1350 px | sRGB | 90% |
+| Preset | `--icc-type` | `--width / --height` | Format |
+|--------|-------------|----------------------|--------|
+| `web` | `SRGB` | 1920 × 1920 (long edge) | JPEG |
+| `print` | `ADOBERGB` | full resolution | JPEG |
 
-Preset specifications are documented in [presets/darktable/presets/README.md](../presets/darktable/presets/README.md).
-
-### Instagram Export
-
-- Apply the `photo-os-look-*` style of your choice.
-- Use the `photo-os instagram` export preset.
-- Output lands in `Export/<session>/web/` with suffix `_ig.jpg`.
-
----
-
-## darktable-cli (Future)
-
-darktable ships a headless CLI for batch export:
-
-```sh
-darktable-cli INPUT.ARW [INPUT.xmp] OUTPUT.jpg [OPTIONS]
-```
-
-A future `photo export` command will use this to export all ★4+ images from the current session without opening the GUI. See [docs/roadmap.md](roadmap.md) for v0.3 plans.
+The XMP sidecar is passed explicitly so darktable applies the full edit history from the sidecar, not just the default processing pipeline.

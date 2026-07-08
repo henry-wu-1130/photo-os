@@ -42,17 +42,20 @@ The session naming convention (`YYYY-MM-DD Project`) makes every album self-desc
 
 ## Rating System
 
-| Rating | Meaning | What to do next |
-|--------|---------|-----------------|
-| ★★★★★ | Portfolio candidate | Edit in darktable, promote to Portfolio |
-| ★★★★ | Export-worthy | Edit in darktable, export JPEG |
-| ★★★ | Keep, don't export | Archive only |
-| ★★ | Weak | Leave unrated or reject |
-| ✗ | Rejected | Discard (hidden in filtered views) |
+Ratings are written to `.xmp` sidecar files and shared between digiKam and darktable. The `xmp:Rating` field is an XMP standard — both tools read and write the same value in the same file.
 
-Ratings are written to `.xmp` and immediately visible in darktable.
+**Rating drives export.** `photo export web` reads `xmp:Rating` from each sidecar and exports only images that meet the threshold (default: ★5). Rating in digiKam is the selection mechanism — not `.xmp` existence, not darktable selection.
 
-**Target per session:** ≤20 images rated ★4+.
+| Rating | Meaning | Exported by `photo export`? |
+|--------|---------|----------------------------|
+| ★★★★★ | Ready to export | **Yes** (default threshold) |
+| ★★★★ | Candidate — needs review | Only with `--rating 4` |
+| ★★★ | Keep only — do not export | No |
+| ★★ | Weak | No |
+| ★ | Reference only | No |
+| ✗ | Rejected | Never |
+
+**Target per session:** ≤20 images rated ★4 or ★5.
 
 ---
 
@@ -71,7 +74,7 @@ A fast three-pass process:
 **Pass 3 — Identify the best**
 - Filter to ★3+
 - Promote the strongest images to ★4 or ★5
-- Be selective: ★4 means "worth editing", ★5 means "worth printing"
+- Be selective: ★4 means "candidate", ★5 means "ready to export"
 
 ---
 

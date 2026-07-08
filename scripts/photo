@@ -53,8 +53,11 @@ Session commands:
   open         <raw|export|portfolio>        Open a session folder in Finder
   export-path                                Print web export path (for darktable)
 
+Export commands:
+  export       [web|print] [--rating N]      Export ★5 photos via darktable-cli
+  export-path                                Print web export path (for darktable GUI)
+
 Library commands:
-  export       <"YYYY-MM-DD Project">        Export edited images via darktable-cli
   backup       [--dest primary|secondary]    Sync library to backup destinations
   status                                     Show library summary
 

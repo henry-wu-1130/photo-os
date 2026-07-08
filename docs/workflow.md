@@ -14,11 +14,11 @@ Each tool owns exactly one stage. No tool reaches into another tool's domain.
 | Import | `photo import` | RAW files in library; current session set |
 | Rate | digiKam | Star ratings in `.xmp` sidecar files |
 | Edit | darktable | Edit history in `.xmp` sidecar files |
-| Export | darktable (manual) | JPEGs in `Export/<session>/web/` or `print/` |
+| Export | `photo export web` | JPEGs in `Export/<session>/web/` or `print/` |
 | Curate | `photo open export` + manual | Selected JPEGs copied to `Portfolio/` |
 | Archive | `photo backup` | Synced copies on backup drives |
 
-**darktable is the editor, not the file manager.** It never decides where exports go. The destination is always `photo export-path`, which the user pastes into darktable's export dialog.
+**Rating drives export.** `photo export` reads `xmp:Rating` from each sidecar and exports only images rated ★5 (configurable). darktable handles the rendering; photo-os decides what gets rendered and where it goes.
 
 ---
 
@@ -81,17 +81,17 @@ photo import /Volumes/MEMORY_CARD
 
 **Rating system:**
 
-| Rating | Meaning |
-|--------|---------|
-| ★★★★★ | Portfolio candidate |
-| ★★★★ | Export-worthy |
-| ★★★ | Keep, not export |
-| ★★ | Weak |
-| ✗ | Rejected |
+| Rating | Meaning | `photo export` behaviour |
+|--------|---------|--------------------------|
+| ★★★★★ | Ready to export | Exported (default) |
+| ★★★★ | Candidate — needs review | Exported with `--rating 4` |
+| ★★★ | Keep only | Skipped |
+| ★★ | Weak | Skipped |
+| ✗ | Rejected | Always skipped |
 
-Ratings are written to `.xmp` sidecar files and are readable by both digiKam and darktable.
+Ratings are written to `xmp:Rating` in the `.xmp` sidecar and are shared between digiKam and darktable. The field is an XMP standard — both tools read and write the same value.
 
-**Target:** ≤20 images rated ★4+ per session.
+**Target:** ≤20 images rated ★4 or ★5 per session.
 
 See [digikam.md](digikam.md) for setup and keyboard shortcuts.
 
@@ -116,32 +116,40 @@ See [darktable.md](darktable.md) for module order and style conventions.
 
 ## Stage 5: Export
 
-**Goal:** Generate JPEG derivatives from edited RAW files.
+**Goal:** Export selected photos — not all edited photos, only those rated ★5.
 
-**Tool:** darktable (GUI or CLI in v0.3)
+**Tool:** `photo export` (calls `darktable-cli`)
 
-**Step 1** — Get the export destination:
 ```sh
-photo export-path
-# → /Users/henry/Photography/Export/2026-07-08 Taipei Blue Hour/web
+photo export web      # export ★5 images to Export/<session>/web/
+photo export print    # export ★5 images to Export/<session>/print/
 ```
 
-**Step 2** — In darktable:
-1. Select ★4+ images in lighttable.
-2. Open Export panel.
-3. Set destination to the path printed above.
-4. Choose preset: `photo-os web` (1080px, sRGB, JPEG 90%).
-5. Export.
+**What happens:**
+1. Reads the current session.
+2. Scans `RAW/<session>/*.ARW` for sidecar files.
+3. Parses `xmp:Rating` from each `.xmp` sidecar.
+4. Passes ★5 images to `darktable-cli` one by one.
+5. darktable-cli applies the full edit history from the `.xmp` and renders the JPEG.
+6. Output lands in `Export/<session>/web/` or `print/`.
 
 **Presets:**
 
-| Preset | Size | Profile | Quality | Folder |
-|--------|------|---------|---------|--------|
-| `photo-os web` | 1080px long edge | sRGB | 90% | `web/` |
-| `photo-os print` | Full resolution | AdobeRGB | 95% | `print/` |
-| `photo-os instagram` | 1080×1350 | sRGB | 90% | `web/` |
+| Command | ICC profile | Max size | Output folder |
+|---------|-------------|----------|---------------|
+| `photo export web` | sRGB | 1920 × 1920 px | `web/` |
+| `photo export print` | AdobeRGB | full resolution | `print/` |
 
-> v0.3 will add `photo export` to automate this via `darktable-cli`.
+**Flags:**
+- `--rating N` — export images rated ★N or above (default: 5)
+- `--dry-run` — list which files would be exported without exporting
+
+**Fallback (darktable GUI):**
+```sh
+photo export-path
+# → /Users/you/Photography/Export/2026-07-08 Taipei Blue Hour/web
+```
+Paste this path into darktable's Export destination field for manual export.
 
 ---
 

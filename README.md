@@ -31,7 +31,7 @@ Shoot → Import → Rate → Edit → Export → Curate → Portfolio
 | Import | `photo import` | Files copied to library; session created and remembered |
 | Rate & Cull | digiKam | Star ratings written to `.xmp` sidecars |
 | Edit | darktable | Edits written to `.xmp` sidecars; RAW untouched |
-| Export | darktable (manual) | JPEGs saved to the current session's `Export/` folder |
+| Export | `photo export web` | ★5 photos exported via darktable-cli |
 | Curate | `photo open export` + manual | Best JPEGs promoted to `Portfolio/` |
 | Portfolio | *(automated in v0.3)* | Curated final works |
 
@@ -136,10 +136,10 @@ photo import /Volumes/MEMORY_CARD
 # 4. Check the session
 photo current
 
-# 5. After editing in darktable, get the export destination
-photo export-path
-# → /Users/you/Photography/Export/2026-07-08 Taipei Blue Hour/web
-# Paste this path into darktable's export dialog.
+# 5. Rate images in digiKam (★5 = ready to export), then:
+photo export web
+# → exports ★5 images via darktable-cli
+# → output: ~/Photography/Export/2026-07-08 Taipei Blue Hour/web/
 
 # 6. Review exports
 photo open export
@@ -152,25 +152,19 @@ photo backup
 
 ## darktable Integration
 
-darktable is responsible for two things only: **editing** and **exporting**.
+darktable is responsible for one thing: **editing RAW files**.
 
-It never decides where files go. The export destination is always determined by `photo export-path` and pasted manually into darktable's export dialog.
+Edits are saved to `.xmp` sidecar files. darktable never decides what gets exported or where — that is photo-os's responsibility.
 
 ```sh
-photo export-path
-# /Users/you/Photography/Export/2026-07-08 Taipei Blue Hour/web
+photo export web
+# Reads xmp:Rating from each .xmp → exports ★5 images via darktable-cli
+# Output: ~/Photography/Export/2026-07-08 Taipei Blue Hour/web/
 ```
 
-Configure darktable export presets once:
+`photo export` uses `darktable-cli` — no GUI required. darktable applies the full edit history from the `.xmp` sidecar when rendering each JPEG.
 
-| Preset | Size | Profile | Quality |
-|--------|------|---------|---------|
-| `photo-os web` | 1080px long edge | sRGB | 90% |
-| `photo-os print` | Full resolution | AdobeRGB | 95% |
-
-See [docs/darktable.md](docs/darktable.md) for setup instructions.
-
-> GUI automation is intentionally out of scope. A future `photo export` command will use `darktable-cli` for batch headless export.
+See [docs/darktable.md](docs/darktable.md) for editing workflow and setup.
 
 ---
 
