@@ -1,138 +1,114 @@
-# digiKam Workflow
+# digiKam
 
-digiKam is used as the photo library browser and metadata manager. It complements darktable — darktable edits, digiKam organizes.
+digiKam is the photo manager in this workflow. It sits between import and editing:
 
-Keep the digiKam setup simple. The goal is fast search and browsing, not a complex tagging taxonomy.
+- **Browse** the session after import
+- **Rate** images with stars
+- **Cull** — reject technically broken shots, identify the best candidates
 
----
-
-## Philosophy
-
-- **Albums = Sessions** — one album per shoot session, matching the folder structure.
-- **Ratings = darktable ratings** — digiKam reads `.xmp` ratings directly.
-- **Tags = minimal** — only tag what you can't find via date or album name.
-- **Search = primary interface** — use digiKam's search instead of manual browsing.
+digiKam does **not** edit RAW files. It does not decide what gets exported. It is a fast, keyboard-driven review tool.
 
 ---
 
-## Initial Setup
+## Setup
 
-### Connect to Photo Library
+### 1. Add the photo library
 
-1. `Settings → Configure digiKam → Collections`
-2. Add `~/Photography` as a monitored root collection.
-3. digiKam will scan and index all images automatically.
+`Settings → Configure digiKam → Collections → Add Collection`
 
-### XMP Sync
+Point it at `~/Photography`. digiKam will scan and index all images automatically.
 
-digiKam reads and writes `.xmp` sidecar files, compatible with darktable.
+### 2. Enable XMP sidecar sync
 
-- `Settings → Metadata → Behavior → Read metadata from sidecar files: always`
-- `Settings → Metadata → Behavior → Write metadata to sidecar files: always`
+`Settings → Metadata → Behavior`
+- **Read metadata from sidecar files:** always
+- **Write metadata to sidecar files:** always
 
-This ensures ratings set in darktable appear in digiKam and vice versa.
-
-### Face Detection (optional)
-
-Useful for portrait work. Enable under `Settings → Configure digiKam → Face Management`.
+This is essential. Ratings set in digiKam must be visible in darktable, and vice versa. Both tools share the same `.xmp` files — there is only one source of truth.
 
 ---
 
 ## Album Structure
 
-Albums in digiKam mirror the filesystem:
+Albums in digiKam mirror the filesystem. No manual album creation is needed.
 
 ```
-Photography/
-└── RAW/
-    └── 2025/
-        └── 2025-06-15 Tokyo Street/     ← Album
+Photography/RAW/2026/2026-07-08 Taipei Blue Hour/   ← Album
 ```
 
-**Do not create manual albums** beyond what the filesystem already provides. The folder naming convention (`YYYY-MM-DD Location Theme`) makes albums self-describing.
+The session naming convention (`YYYY-MM-DD Project`) makes every album self-describing and chronologically sorted.
 
 ---
 
 ## Rating System
 
-Ratings are shared with darktable via `.xmp`. Do not maintain separate ratings in digiKam — always set ratings in darktable.
+| Rating | Meaning | What to do next |
+|--------|---------|-----------------|
+| ★★★★★ | Portfolio candidate | Edit in darktable, promote to Portfolio |
+| ★★★★ | Export-worthy | Edit in darktable, export JPEG |
+| ★★★ | Keep, don't export | Archive only |
+| ★★ | Weak | Leave unrated or reject |
+| ✗ | Rejected | Discard (hidden in filtered views) |
 
-| Rating | Use |
-|--------|-----|
-| ★★★★★ | Portfolio candidate |
-| ★★★★ | Export-worthy |
-| ★★★ | Keep, not export |
-| ★★ | Weak |
-| ★ | Reference only |
-| ✗ | Rejected |
+Ratings are written to `.xmp` and immediately visible in darktable.
+
+**Target per session:** ≤20 images rated ★4+.
 
 ---
 
-## Tags
+## Culling Workflow
 
-Keep the tag hierarchy flat and small. Three categories are sufficient:
+A fast three-pass process:
+
+**Pass 1 — Reject technical failures** (blur, wrong exposure, eyes closed)
+- Use keyboard: `R` to reject, arrow keys to advance
+- Goal: clear out the obvious failures quickly
+
+**Pass 2 — Rate survivors 1–3**
+- Filter to non-rejected images
+- Assign ★1–3 based on composition and subject
+
+**Pass 3 — Identify the best**
+- Filter to ★3+
+- Promote the strongest images to ★4 or ★5
+- Be selective: ★4 means "worth editing", ★5 means "worth printing"
+
+---
+
+## Tags (Optional)
+
+Tags are optional. The date-based folder structure handles most navigation needs.
+
+Add tags only when they add search value that the folder name doesn't provide:
 
 ```
-Tags/
-├── Subject/
-│   ├── Street
-│   ├── Portrait
-│   ├── Architecture
-│   ├── Landscape
-│   └── Still Life
-├── Mood/
-│   ├── B&W
-│   └── Color
-└── Status/
-    ├── Portfolio
-    └── Published
+Subject/Street
+Subject/Portrait
+Subject/Architecture
+Subject/Landscape
 ```
 
-**Rules:**
-- Apply `Status/Portfolio` to images promoted to the Portfolio folder.
-- Apply `Status/Published` after sharing to social.
-- Apply Subject and Mood tags sparingly — only when they add search value.
-- Do NOT tag every image. Tag only when you need to find things by that dimension.
+Do not create a deep tag taxonomy. If you can find the image by searching the album name, a tag is redundant.
 
 ---
 
-## Search Workflow
+## Searching
 
-Use digiKam's **Advanced Search** (`Ctrl+F4`) for most queries:
+Use **Advanced Search** (`Ctrl+F4`) for cross-session queries:
 
-| Goal | Search |
-|------|--------|
-| Find all ★5 images | Rating = 5 |
-| Find Tokyo sessions | Album name contains "Tokyo" |
-| Find all portraits | Tag contains "Portrait" |
-| Find unpublished ★4+ | Rating ≥ 4 AND NOT tag "Published" |
-| Find images from a date range | Date between YYYY-MM-DD and YYYY-MM-DD |
-
-Save frequent searches as **Named Searches** in digiKam for one-click access.
-
----
-
-## Saved Searches (set up on first run)
-
-| Name | Criteria |
+| Goal | Criteria |
 |------|----------|
-| Portfolio Candidates | Rating = 5 |
-| Export Queue | Rating = 4 |
-| Recent Sessions | Date within last 30 days |
-| Unpublished | Rating ≥ 4, NOT tag Published |
+| All portfolio candidates | Rating = 5 |
+| Export queue | Rating = 4 |
+| Recent sessions | Date within last 30 days |
+| All street photos | Tag contains "Street" |
+
+Save frequent searches as **Named Searches** for one-click access.
 
 ---
 
 ## Maintenance
 
-- After each import: let digiKam rescan (it does this automatically if monitoring is enabled).
-- After each darktable editing session: `Album → Rescan for new images` to pick up new `.xmp` changes.
-- Monthly: run `Album → Sync metadata with files` to ensure ratings are consistent.
-
----
-
-## What digiKam Does NOT Do
-
-- **Edit RAW** — use darktable for all editing.
-- **Store canonical ratings** — `.xmp` sidecar is the canonical source; digiKam reads from it.
-- **Manage exports** — export management is handled by `photo export` script and darktable.
+- **After each import:** digiKam rescans automatically if collection monitoring is on.
+- **After a darktable session:** `Album → Rescan for new images` picks up new `.xmp` changes.
+- **Monthly:** `Album → Sync metadata with files` to confirm ratings are consistent.

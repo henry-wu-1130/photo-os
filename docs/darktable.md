@@ -1,6 +1,14 @@
-# darktable Workflow
+# darktable
 
-darktable is used as the primary RAW processor. All edits are non-destructive and stored in `.xmp` sidecar files.
+darktable is the RAW editor in this workflow. Its role is narrowly defined:
+
+- **Edit** RAW files non-destructively
+- **Write** edits to `.xmp` sidecar files
+- **Export** JPEGs to the location specified by `photo export-path`
+
+darktable does **not** decide folder structure or session organization. photo-os handles that.
+
+> GUI automation is intentionally out of scope. A future `photo export` command will use `darktable-cli` for headless batch export.
 
 Version target: darktable 4.x
 
@@ -8,161 +16,135 @@ Version target: darktable 4.x
 
 ## Initial Setup
 
-### Preferences to configure
+### Preferences
+
+**Storage — most important:**
+- `Preferences → Storage → XMP → Write sidecar files for each image: on`
+
+This is the most critical setting. Without it, edits exist only in darktable's database and are lost if the database is corrupted or the library is moved.
 
 **Lighttable:**
-- `Settings → Lighttable → Filmstrip → Show overlays: always`
-- `Settings → Lighttable → Thumbnails: On-disk cache` (faster for large libraries)
+- `Preferences → Lighttable → Thumbnails → Use on-disk thumbnail cache` — faster browsing for large sessions
 
-**Storage:**
-- Enable `Settings → Storage → XMP → Write sidecar files automatically`
-- This ensures edits survive even if the database is lost.
-
-**Import:**
-- `Settings → Import → Only import new images` (skip duplicates)
+**Import behavior:**
+- `Preferences → Import → Only import new images` — avoids re-importing duplicates
 
 ---
 
-## RAW Import
+## Opening a Session
 
-1. In darktable lighttable, click **Import** (or press `Ctrl+I`).
-2. Navigate to the session folder under `RAW/YYYY/YYYY-MM-DD .../`.
-3. Import **folder** (not individual files).
-4. darktable will create `.xmp` sidecar files for each image.
+1. In darktable lighttable, press `Ctrl+I` (Import).
+2. Choose **Import folder**.
+3. Navigate to the session folder: `~/Photography/RAW/YYYY/YYYY-MM-DD Project/`.
+4. Import. darktable creates `.xmp` sidecars for each image.
 
-**Do not move files after import** — darktable stores absolute paths. Use `photo import` script to set the correct path before importing into darktable.
-
----
-
-## Culling (Rating)
-
-In lighttable, use keyboard shortcuts for fast culling:
-
-| Key | Action |
-|-----|--------|
-| `0` | No rating |
-| `1–5` | Star rating |
-| `r` | Toggle reject flag |
-| `Space` | Next image |
-| `Backspace` | Previous image |
-| `F1` | Red label (pick) |
-| `F2` | Yellow label |
-| `F3` | Green label |
-
-**Recommended culling flow:**
-1. First pass at full filmstrip speed — reject (`r`) anything clearly broken.
-2. Filter to non-rejected. Second pass — rate 1–3.
-3. Filter to ★3+. Third pass — promote best to ★4 or ★5.
-4. Target: ≤20 images rated ★4+.
+**Do not move files after import.** darktable stores absolute paths. If you need to restructure, use `photo import` first to establish the correct path, then import into darktable.
 
 ---
 
 ## XMP Sidecar Files
 
-darktable writes edit history to `.xmp` files automatically (if configured above).
+Every edit, rating, and color label is stored in a `.xmp` sidecar file alongside the `.ARW`:
 
-- `.xmp` files are plain XML — version-controllable and human-readable.
-- Ratings and color labels are also stored in `.xmp`.
-- **Back up `.xmp` files with your RAW files** — they are your edit history.
+```
+RAW/2026/2026-07-08 Taipei Blue Hour/
+├── DSC00001.ARW
+├── DSC00001.xmp    ← edit history, rating, color labels
+├── DSC00002.ARW
+└── DSC00002.xmp
+```
 
-To force-write XMP for all images in a session:
-- Select all (`Ctrl+A`) → right-click → **Write sidecar files**
+`.xmp` files are plain XML. They are:
+- Human-readable
+- Version-controllable
+- Readable by both darktable and digiKam
+
+**Back up `.xmp` files with your RAW files** — they are your entire edit history.
+
+To force-write XMP for a session: select all (`Ctrl+A`) → right-click → **Write sidecar files**.
+
+---
+
+## Editing Workflow
+
+Work on ★4+ images (rated in digiKam before this stage).
+
+Recommended module order in the darkroom:
+
+1. **Exposure** — correct exposure offset
+2. **White Balance** — set color temperature
+3. **Filmic RGB** — compress dynamic range and set tone mapping
+4. **Color Calibration** — color correction if needed
+5. **Denoise (profiled)** — noise reduction (especially above ISO 1600)
+6. **Local adjustments** — masks, dodge/burn
+7. **Crop** — final composition
+
+Apply a named style first (base exposure + tone), then make per-image corrections on top.
 
 ---
 
 ## Styles
 
-Styles are named, reusable groups of darktable module settings.
+Styles are saved groups of module settings — the equivalent of a Lightroom preset.
 
 **Naming convention:**
 ```
-photo-os/base-v1        ← baseline exposure, WB, noise
-photo-os/look-warm-v1   ← warm color grade
-photo-os/look-film-v1   ← filmic B&W
-photo-os/instagram-v1   ← Instagram crop + look
+photo-os-base-v1          ← baseline for all images
+photo-os-look-warm-v1     ← warm color grade
+photo-os-look-film-v1     ← filmic monochrome
 ```
 
-**To apply a style:**
-- In lighttable: right-click image → Styles → select style
-- In darkroom: bottom panel → Styles → select style
+Apply: right-click image in lighttable → **Styles** → select
 
-**To export styles:**
-- `Settings → Styles → Export` → save `.dtstyle` to `presets/darktable/styles/`
+Export to file: `Preferences → Styles → [select] → Export` → save to `presets/darktable/styles/`
 
----
-
-## Editing Workflow (Darkroom)
-
-Recommended module order (darktable processes bottom-up in pipeline, but work top-down in interface):
-
-1. **Exposure** — set correct exposure
-2. **White Balance** — set color temperature
-3. **Filmic RGB** — set dynamic range compression and tone mapping
-4. **Color Calibration** — correct color if needed
-5. **Denoise (profiled)** — noise reduction (especially ISO 1600+)
-6. **Local Adjustments** — masks, dodge/burn
-7. **Crop** — final composition
-
-Apply base style first, then make per-image adjustments.
+Style files (`.dtstyle`) in this repository can be imported on a new machine to recreate the exact look.
 
 ---
 
 ## Export
 
-### From darktable GUI
+Export is performed manually via the darktable GUI. photo-os provides the destination path.
 
-1. Select images (★4+) in lighttable.
-2. Click **Export** (bottom right).
-3. Choose preset:
-   - `photo-os web` → JPEG 90%, 1080px long edge, sRGB
-   - `photo-os print` → JPEG 95%, full resolution, AdobeRGB
-4. Set output path to `Export/YYYY-MM-DD .../web/` or `.../print/`.
-5. Click **Export**.
-
-### Via `photo export` script (v0.3+)
+### Step-by-step
 
 ```sh
-photo export "2025-06-15 Tokyo Street"
+# 1. Get the destination path
+photo export-path
+# → /Users/you/Photography/Export/2026-07-08 Taipei Blue Hour/web
 ```
 
-This calls darktable CLI (`darktable-cli`) to automate the export without opening the GUI.
+2. In darktable lighttable, select all ★4+ images.
+3. Open the **Export** panel (bottom right).
+4. Set **Destination folder** to the path from step 1.
+5. Select a preset and click **Export**.
+
+### Export Presets
+
+Configure these once in darktable and save them by name:
+
+| Preset name | Format | Size | Color profile | Quality |
+|-------------|--------|------|---------------|---------|
+| `photo-os web` | JPEG | 1080px long edge | sRGB | 90% |
+| `photo-os print` | JPEG | Full resolution | AdobeRGB | 95% |
+| `photo-os instagram` | JPEG | 1080 × 1350 px | sRGB | 90% |
+
+Preset specifications are documented in [presets/darktable/presets/README.md](../presets/darktable/presets/README.md).
+
+### Instagram Export
+
+- Apply the `photo-os-look-*` style of your choice.
+- Use the `photo-os instagram` export preset.
+- Output lands in `Export/<session>/web/` with suffix `_ig.jpg`.
 
 ---
 
-## Instagram Export
+## darktable-cli (Future)
 
-Instagram-specific requirements:
-- Aspect ratio: 1:1, 4:5, or 1.91:1
-- Size: 1080px wide (1080×1080, 1080×1350, or 1080×566)
-- Color: sRGB
-- Format: JPEG
-
-**darktable style for Instagram:**
-1. Apply `photo-os/instagram-v1` style.
-2. This style sets:
-   - Crop to 4:5 (portrait, recommended for Instagram)
-   - Export size: 1080×1350
-   - Color profile: sRGB
-
-**Export preset:** `photo-os instagram`
-- Output path: `Export/YYYY-MM-DD .../web/`
-- Filename suffix: `_ig`
-
----
-
-## darktable CLI Reference
-
-darktable includes `darktable-cli` for headless export:
+darktable ships a headless CLI for batch export:
 
 ```sh
-darktable-cli INPUT_FILE [XMP_FILE] OUTPUT_FILE [OPTIONS]
-
-# Export a single file with a specific style
-darktable-cli DSC00001.ARW DSC00001.xmp output.jpg \
-  --style "photo-os web" \
-  --out-ext jpg \
-  --icc-type SRGB \
-  --width 1080 --height 1080
+darktable-cli INPUT.ARW [INPUT.xmp] OUTPUT.jpg [OPTIONS]
 ```
 
-Used internally by `photo export` script.
+A future `photo export` command will use this to export all ★4+ images from the current session without opening the GUI. See [docs/roadmap.md](roadmap.md) for v0.3 plans.
