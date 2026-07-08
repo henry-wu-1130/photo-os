@@ -1,44 +1,29 @@
 #!/bin/sh
-# commands/export.sh - Export ★5 photos from the current session using darktable-cli
-# Usage: photo export [web|print] [--rating N] [--dry-run]
+# commands/export.sh - Batch export all RAW files in the current session
+# Usage: photo export [web|print] [--dry-run]
 #
-# How it works:
-#   1. Reads the current session.
-#   2. Finds all .ARW files in the session's RAW directory.
-#   3. For each .ARW, reads xmp:Rating from the sidecar .xmp file.
-#   4. Exports only images rated ★N or above (default: ★5) using darktable-cli.
-#   5. Output lands in Export/<session>/web/ or print/.
+# Exports every .ARW file found in the current session's RAW directory.
+# No rating filter. Cull unwanted files in digiKam before running this.
 #
-# The export trigger is the xmp:Rating field — not the existence of a .xmp file.
-# Rating is set in digiKam (or darktable lighttable) and stored in the .xmp sidecar.
-# darktable-cli applies the full edit history from the same .xmp when exporting.
+# If a .xmp sidecar exists alongside a .ARW, darktable-cli applies the
+# full edit history automatically. Files without a sidecar are exported
+# with darktable's default processing pipeline.
 
-_DARKTABLE_CLI=""   # set by cmd_export; used by _run_darktable_export
+_DARKTABLE_CLI=""   # resolved once in cmd_export; shared by _run_export
 
 cmd_export() {
     PRESET="web"
-    MIN_RATING=5
     DRY_RUN=0
 
     # ── Parse arguments ───────────────────────────────────────────────────────
 
     while [ $# -gt 0 ]; do
         case "$1" in
-            web|print)
-                PRESET="$1"
-                shift
-                ;;
-            --rating)
-                MIN_RATING="$2"
-                shift 2
-                ;;
-            --dry-run)
-                DRY_RUN=1
-                shift
-                ;;
+            web|print) PRESET="$1"; shift ;;
+            --dry-run) DRY_RUN=1;   shift ;;
             -*)
                 log_error "Unknown flag: $1"
-                log_info  "Usage: photo export [web|print] [--rating N] [--dry-run]"
+                log_info  "Usage: photo export [web|print] [--dry-run]"
                 exit 1
                 ;;
             *)
@@ -47,14 +32,6 @@ cmd_export() {
                 ;;
         esac
     done
-
-    case "$MIN_RATING" in
-        [1-5]) ;;
-        *)
-            log_error "Invalid --rating value: '$MIN_RATING' (expected 1–5)"
-            exit 1
-            ;;
-    esac
 
     # ── Locate darktable-cli ──────────────────────────────────────────────────
 
@@ -70,7 +47,6 @@ cmd_export() {
 
     session_require
     SESSION="$CURRENT_SESSION"
-
     RAW_DIR="$(raw_path "$SESSION")"
     OUT_DIR="$(export_path "$SESSION" "$PRESET")"
 
@@ -80,130 +56,102 @@ cmd_export() {
         exit 1
     fi
 
-    log_info "Session: $SESSION"
-    log_info "Filter:  ★${MIN_RATING}+ (set in digiKam)"
-    log_info "Output:  $OUT_DIR"
+    # ── Collect files ─────────────────────────────────────────────────────────
+    # Write the sorted list to a temp file so Phase 2 can iterate in the main
+    # shell (not a subshell) and update CURRENT / FAILED counters correctly.
+
+    TMP_LIST="$(mktemp /tmp/photo-export.XXXXXX)"
+    trap 'rm -f "$TMP_LIST"' EXIT INT TERM
+
+    find "$RAW_DIR" -maxdepth 1 -iname "*.arw" | sort > "$TMP_LIST"
+    TOTAL=$(wc -l < "$TMP_LIST" | tr -d ' ')
+
+    # ── Header ────────────────────────────────────────────────────────────────
+
     printf '\n'
+    printf 'Current Session\n\n'
+    printf '  %s\n\n' "$SESSION"
+    printf 'Found\n\n'
+    printf '  %s RAW file(s)\n\n' "$TOTAL"
+    printf 'Export target\n\n'
+    printf '  %s\n\n' "$OUT_DIR"
 
-    # ── Phase 1: select images by rating ─────────────────────────────────────
-    #
-    # Runs in a pipeline subshell; results are written to a temp file so that
-    # Phase 2 can update counters in the main shell without subshell scoping.
-
-    tmp_list="$(mktemp /tmp/photo-export.XXXXXX)"
-    trap 'rm -f "$tmp_list"' EXIT INT TERM
-
-    find "$RAW_DIR" -maxdepth 1 -iname "*.arw" | sort | while IFS= read -r raw; do
-        xmp="$(_find_xmp "$raw")"
-        [ -n "$xmp" ] || continue                          # no sidecar → not rated
-
-        rating="$(_xmp_rating "$xmp")"
-        [ -n "$rating" ] || continue                       # no rating field → skip
-        [ "$rating" -ge "$MIN_RATING" ] 2>/dev/null || continue  # below threshold → skip
-
-        printf '%s\n' "$raw" >> "$tmp_list"
-    done
-
-    SELECTED=$(wc -l < "$tmp_list" | tr -d ' ')
-
-    if [ "$SELECTED" -eq 0 ]; then
-        log_info "No images rated ★${MIN_RATING}+ found in this session."
-        log_info "Rate images in digiKam (★5 = ready to export), then run:"
-        log_info "  photo export $PRESET"
-        rm -f "$tmp_list"
+    if [ "$TOTAL" -eq 0 ]; then
+        printf 'Nothing to export.\n\n'
+        rm -f "$TMP_LIST"
         return 0
     fi
-
-    log_info "Found $SELECTED image(s) rated ★${MIN_RATING}+"
-    printf '\n'
 
     # ── Dry run ───────────────────────────────────────────────────────────────
 
     if [ "$DRY_RUN" -eq 1 ]; then
+        printf 'Dry run — no files will be exported.\n\n'
         while IFS= read -r raw; do
-            xmp="$(_find_xmp "$raw")"
-            rating="$(_xmp_rating "$xmp")"
-            log_info "[dry-run] ★${rating}  $(basename "$raw")"
-        done < "$tmp_list"
+            printf '  %s\n' "$(basename "$raw")"
+        done < "$TMP_LIST"
         printf '\n'
-        log_info "[dry-run] Would export $SELECTED file(s) to $OUT_DIR"
-        rm -f "$tmp_list"
+        rm -f "$TMP_LIST"
         return 0
     fi
 
-    # ── Phase 2: export ───────────────────────────────────────────────────────
+    # ── Export ────────────────────────────────────────────────────────────────
 
     mkdir -p "$OUT_DIR"
+    printf 'Exporting...\n\n'
 
-    EXPORTED=0
+    CURRENT=0
     FAILED=0
 
     while IFS= read -r raw; do
-        xmp="$(_find_xmp "$raw")"
-        rating="$(_xmp_rating "$xmp")"
-
-        if _run_darktable_export "$raw" "$xmp" "$OUT_DIR" "$PRESET"; then
-            log_ok "★${rating}  $(basename "$raw")"
-            EXPORTED=$((EXPORTED + 1))
+        if _run_export "$raw" "$OUT_DIR" "$PRESET"; then
+            :
         else
-            log_error "★${rating}  $(basename "$raw")  (export failed)"
             FAILED=$((FAILED + 1))
         fi
-    done < "$tmp_list"
+        CURRENT=$((CURRENT + 1))
+        _draw_progress "$CURRENT" "$TOTAL"
+    done < "$TMP_LIST"
 
-    rm -f "$tmp_list"
+    printf '\n\n'
+    rm -f "$TMP_LIST"
 
-    printf '\n'
+    # ── Summary ───────────────────────────────────────────────────────────────
+
+    SUCCEEDED=$((TOTAL - FAILED))
     if [ "$FAILED" -eq 0 ]; then
-        log_ok "Done: $EXPORTED image(s) exported → $OUT_DIR"
+        printf 'Done.\n\n'
+        printf '  %d image(s) → %s\n\n' "$SUCCEEDED" "$OUT_DIR"
     else
-        log_ok "Done: $EXPORTED exported, $FAILED failed → $OUT_DIR"
+        printf 'Done with errors.\n\n'
+        printf '  %d exported, %d failed → %s\n\n' "$SUCCEEDED" "$FAILED" "$OUT_DIR"
     fi
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-# Find the XMP sidecar for a RAW file.
-# darktable writes: DSC00001.ARW.xmp  (appends .xmp to the full filename)
-# Some tools write: DSC00001.xmp      (replaces extension)
-# Returns the sidecar path, or empty string if neither form exists.
-_find_xmp() {
-    raw="$1"
-    dir="$(dirname "$raw")"
-    base="$(basename "$raw")"
+# Draw an in-place ASCII progress bar using carriage return.
+# Output stays on the same terminal line until the final newline after the loop.
+_draw_progress() {
+    current="$1"
+    total="$2"
+    bar_width=20
 
-    # darktable convention: DSC00001.ARW.xmp
-    f="${dir}/${base}.xmp"
-    [ -f "$f" ] && { printf '%s\n' "$f"; return; }
+    if [ "$total" -gt 0 ]; then
+        filled=$((current * bar_width / total))
+    else
+        filled=0
+    fi
+    empty=$((bar_width - filled))
 
-    # Extension-replaced convention: DSC00001.xmp
-    f="${dir}/${base%.*}.xmp"
-    [ -f "$f" ] && { printf '%s\n' "$f"; return; }
+    bar=""
+    i=0
+    while [ "$i" -lt "$filled" ]; do bar="${bar}█"; i=$((i + 1)); done
+    while [ "$i" -lt "$bar_width" ]; do bar="${bar}░"; i=$((i + 1)); done
+
+    printf '\r%s  %d / %d' "$bar" "$current" "$total"
 }
 
-# Read xmp:Rating from an XMP sidecar file.
-#
-# XMP stores rating in one of two forms depending on the writing application:
-#
-#   Attribute (darktable, Lightroom):
-#     <rdf:Description ... xmp:Rating="5" ...>
-#
-#   Element (digiKam, Exiftool):
-#     <xmp:Rating>5</xmp:Rating>
-#
-# The sed expression below matches both forms by looking for the literal string
-# "xmp:Rating" followed by zero or more non-digit characters, then captures the
-# optional minus sign and digit(s) that follow.
-#
-# Returns the rating integer (-1 to 5), or empty string if not present.
-_xmp_rating() {
-    xmp="$1"
-    [ -f "$xmp" ] || return
-    sed -n 's/.*xmp:Rating[^0-9-]*\(-\{0,1\}[0-9]\{1,\}\).*/\1/p' "$xmp" | head -1
-}
-
-# Locate darktable-cli.
-# Checks PATH first, then the standard macOS app bundle location.
+# Locate darktable-cli: PATH first, then the standard macOS app bundle.
 _find_darktable_cli() {
     if command -v darktable-cli >/dev/null 2>&1; then
         command -v darktable-cli
@@ -215,18 +163,17 @@ _find_darktable_cli() {
     fi
 }
 
-# Export a single RAW file using darktable-cli.
-# The XMP sidecar is passed explicitly so darktable applies the full edit history.
+# Export one RAW file with darktable-cli.
+# darktable-cli automatically detects and applies the .xmp sidecar if it exists.
 # Returns 0 on success, non-zero on failure.
-_run_darktable_export() {
+_run_export() {
     raw="$1"
-    xmp="$2"
-    out_dir="$3"
-    preset="$4"
+    out_dir="$2"
+    preset="$3"
 
     case "$preset" in
         web)
-            "$_DARKTABLE_CLI" "$raw" "$xmp" "$out_dir" \
+            "$_DARKTABLE_CLI" "$raw" "$out_dir" \
                 --out-ext jpg \
                 --icc-type SRGB \
                 --width 1920 --height 1920 \
@@ -234,7 +181,7 @@ _run_darktable_export() {
                 >/dev/null 2>&1
             ;;
         print)
-            "$_DARKTABLE_CLI" "$raw" "$xmp" "$out_dir" \
+            "$_DARKTABLE_CLI" "$raw" "$out_dir" \
                 --out-ext jpg \
                 --icc-type ADOBERGB \
                 --hq true \

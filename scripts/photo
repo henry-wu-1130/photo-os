@@ -54,8 +54,8 @@ Session commands:
   export-path                                Print web export path (for darktable)
 
 Export commands:
-  export       [web|print] [--rating N]      Export ★5 photos via darktable-cli
-  export-path                                Print web export path (for darktable GUI)
+  export       [web|print] [--dry-run]       Batch export via darktable-cli
+  export-path                                Print web export path (paste into darktable)
 
 Library commands:
   backup       [--dest primary|secondary]    Sync library to backup destinations
@@ -65,11 +65,11 @@ Other:
   help                                       Show this message
 
 Typical workflow:
-  photo import /Volumes/MEMORY_CARD   # import + set current session
-  photo current                       # show paths
-  photo export-path                   # copy into darktable export field
-  photo open export                   # review exported JPEGs in Finder
-  photo backup                        # sync to backup drive
+  photo import                # auto-detect SD card, import, set current session
+  photo current               # show paths for current session
+  photo export web            # batch export all RAW files via darktable-cli
+  photo open export           # review exported JPEGs in Finder
+  photo backup                # sync to backup drive
 
 Config: ~/.photo-os/config
 Docs:   https://github.com/henry-wu-1130/photo-os
