@@ -52,11 +52,21 @@ raw_path() {
     printf '%s\n' "${PHOTO_ROOT}/RAW/${year}/${session}"
 }
 
-# Resolve Export path for a session
+# Resolve Export path for a session (optionally include preset subfolder)
 export_path() {
     session="$1"
-    preset="${2:-web}"
-    printf '%s\n' "${PHOTO_ROOT}/Export/${session}/${preset}"
+    preset="${2:-}"
+    if [ -n "$preset" ]; then
+        printf '%s\n' "${PHOTO_ROOT}/Export/${session}/${preset}"
+    else
+        printf '%s\n' "${PHOTO_ROOT}/Export/${session}"
+    fi
+}
+
+# Resolve Portfolio path for a session
+portfolio_path() {
+    session="$1"
+    printf '%s\n' "${PHOTO_ROOT}/Portfolio/${session}"
 }
 
 # Validate session name format: "YYYY-MM-DD anything"
