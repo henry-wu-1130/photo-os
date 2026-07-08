@@ -48,7 +48,7 @@ Usage: photo <command> [arguments]
 
 Session commands:
   new          <"YYYY-MM-DD Project">        Create a new session folder structure
-  import       <source> [--session NAME]     Import RAW files; sets current session
+  import       [source] [--session NAME]     Import RAW files; auto-detects SD card
   current                                    Show current session paths
   open         <raw|export|portfolio>        Open a session folder in Finder
   export-path                                Print web export path (for darktable)

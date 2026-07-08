@@ -1,6 +1,9 @@
 #!/bin/sh
-# commands/import.sh - Import RAW files from a memory card or folder
-# Usage: photo import <source_path> [--session "YYYY-MM-DD Location Theme"] [--dry-run] [--no-eject]
+# commands/import.sh - Import RAW files from a camera SD card or folder
+# Usage: photo import [source_path] [--session "YYYY-MM-DD Project"] [--dry-run] [--no-eject]
+#
+# When source_path is omitted, camera cards are detected automatically by
+# scanning /Volumes for directories that contain a DCIM subfolder.
 
 cmd_import() {
     SOURCE=""
@@ -39,10 +42,10 @@ cmd_import() {
         esac
     done
 
+    # ── Source detection ──────────────────────────────────────────────────────
+
     if [ -z "$SOURCE" ]; then
-        log_error "Source path required."
-        log_info  "Usage: photo import <source_path> [--session \"YYYY-MM-DD Location Theme\"]"
-        exit 1
+        SOURCE="$(_detect_camera_card)"
     fi
 
     if [ ! -d "$SOURCE" ]; then
@@ -52,7 +55,8 @@ cmd_import() {
 
     require_cmd rsync
 
-    # Count .ARW files on source (case-insensitive)
+    # ── Count RAW files ───────────────────────────────────────────────────────
+
     ARW_COUNT=$(find "$SOURCE" -iname "*.arw" | wc -l | tr -d ' ')
 
     if [ "$ARW_COUNT" -eq 0 ]; then
@@ -84,7 +88,6 @@ cmd_import() {
     # ── Create session if needed ──────────────────────────────────────────────
 
     if [ ! -d "$DEST" ]; then
-        # Source the new command and reuse it so all folders are created consistently.
         # cmd_new also calls session_save, so no need to call it again below.
         . "$CMD_DIR/new.sh"
         cmd_new "$SESSION"
@@ -121,9 +124,54 @@ cmd_import() {
     fi
 }
 
+# ── Camera card detection ─────────────────────────────────────────────────────
+# Scans /Volumes for directories containing a DCIM subfolder.
+# Returns the volume path via stdout; user interaction goes to stderr.
+
+_detect_camera_card() {
+    # A volume is a camera card if and only if it has a DCIM directory.
+    # find at depth 2 gives us: /Volumes/<name>/DCIM
+    cards=$(find /Volumes -maxdepth 2 -mindepth 2 -type d -name "DCIM" 2>/dev/null \
+        | sed 's|/DCIM$||' \
+        | sort)
+
+    if [ -z "$cards" ]; then
+        printf '[photo] No camera SD card detected.\n' >&2
+        printf '[photo] Please insert a camera SD card and try again.\n' >&2
+        printf '[photo] Or specify a path manually: photo import <path>\n' >&2
+        exit 1
+    fi
+
+    count=$(printf '%s\n' "$cards" | wc -l | tr -d ' ')
+
+    if [ "$count" -eq 1 ]; then
+        # Case A: exactly one card — use it automatically
+        printf '[photo] ✓ Camera card detected\n' >&2
+        printf '[photo]   Source: %s\n' "$cards" >&2
+        printf '%s\n' "$cards"
+        return 0
+    fi
+
+    # Case B: multiple cards — show a numbered menu
+    printf '[photo] Multiple camera cards detected:\n' >&2
+    i=1
+    printf '%s\n' "$cards" | while IFS= read -r vol; do
+        printf '  %d) %s\n' "$i" "$vol" >&2
+        i=$((i + 1))
+    done
+    printf '[photo] Choose [1-%d]: ' "$count" >&2
+    read -r answer
+
+    chosen=$(printf '%s\n' "$cards" | sed -n "${answer}p")
+    if [ -z "$chosen" ]; then
+        printf '[photo] ERROR: Invalid choice.\n' >&2
+        exit 1
+    fi
+    printf '%s\n' "$chosen"
+}
+
 # ── Session resolution ────────────────────────────────────────────────────────
-# Returns a session name, either by reusing an existing today session or by
-# prompting for a project name and prepending today's date.
+# Returns a session name via stdout. All user prompts go to stderr.
 
 _resolve_session() {
     today="$(date '+%Y-%m-%d')"
@@ -172,7 +220,7 @@ _resolve_session() {
         fi
     fi
 
-    # Prompt for project name only; date is automatic
+    # Prompt for project name only; date is added automatically
     printf '[photo] Project name: ' >&2
     read -r project_name
 
