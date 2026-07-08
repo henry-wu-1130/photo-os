@@ -78,44 +78,67 @@ Photography/
 ## Workflow
 
 ```
-Shoot → Import → Cull → Edit → Export → Publish → Archive
+Shoot → Import → Rate → Edit → Export → Curate → Portfolio → Archive
 ```
+
+**Tool responsibilities:**
+
+| Stage | Tool | Role |
+|-------|------|------|
+| Import | `photo import` | Copy RAW files; set current session |
+| Rate / Cull | digiKam | Star ratings written to `.xmp` sidecars |
+| Edit | darktable | Non-destructive edits; writes `.xmp` sidecars |
+| Export | darktable | Export JPEGs to the session's `Export/` folder |
+| Curate | `photo curate` *(v0.3)* | Promote ★5 JPEGs to `Portfolio/` |
+| Archive | `photo backup` | Sync RAW + Export to backup destinations |
+
+darktable is **only** responsible for editing and exporting. It never decides where files go — that is defined by the session structure and retrieved via `photo export-path`.
 
 ### 1. Shoot
 - Memory card → Sony A7C II records `.ARW` files
-- Optional: capture session notes in `templates/session-notes.md`
 
 ### 2. Import
-- Run `photo import` to copy RAW files to `RAW/YYYY/YYYY-MM-DD Location Theme/`
-- Files are verified via checksum; duplicates are skipped
-- digiKam rescans the library automatically
+```sh
+photo import /Volumes/MEMORY_CARD
+```
+- Prompts for project name; prepends today's date automatically
+- Creates `RAW/`, `Export/web/`, `Export/print/`, `Portfolio/` folders
+- Sets this session as **current** (`~/.photo-os/current-session`)
 
-### 3. Cull
-- Open session in darktable lighttable
-- Use star ratings to cull:
+### 3. Rate
+- Open session in digiKam
+- Use star ratings (written to `.xmp`):
   - ★★★★★ (5) → Portfolio candidate
   - ★★★★☆ (4) → Export candidate
   - ★★★☆☆ (3) → Keep, do not export
-  - ★★☆☆☆ (2) → Reject (soft)
-  - ✗ Rejected → Reject (hard, hidden in digiKam)
+  - ✗ Rejected → Discard
 
 ### 4. Edit
-- Edit ★4+ images in darktable darkroom
-- Apply named styles for consistent look
-- All edits stored in `.xmp` sidecar files (non-destructive)
+- Open ★4+ images in darktable darkroom
+- Apply styles; all edits saved to `.xmp` sidecar files (non-destructive)
+- RAW files are never modified
 
 ### 5. Export
-- Run `photo export` to export ★4+ images to `Export/`
-- Web preset: 1080px long edge, sRGB, JPEG 90%
-- Print preset: full resolution, AdobeRGB, JPEG 95%
+```sh
+photo export-path   # prints: ~/Photography/Export/2026-07-08 .../web
+```
+- Copy the printed path into darktable's export destination field
+- Export ★4+ images with the `photo-os web` or `photo-os print` preset
+- JPEGs land in the session's `Export/web/` or `Export/print/` folder
 
-### 6. Publish
-- Run `photo review` to open export folder for final review
-- Copy web exports to social media manually or via `photo publish` (future)
+### 6. Curate
+```sh
+photo open export     # review exported JPEGs in Finder
+```
+- Manually promote best images to `Portfolio/` *(automated in v0.3)*
+- See [docs/portfolio.md](docs/portfolio.md) for the curation SOP
 
 ### 7. Archive
-- Run `photo backup` to sync `RAW/` and `Export/` to backup destination
-- RAW files are the single source of truth
+```sh
+photo backup
+```
+- Syncs `RAW/` and `Export/` to configured backup destinations
+- RAW + `.xmp` sidecars are the single source of truth
 
 ---
 
@@ -141,16 +164,22 @@ Shoot → Import → Cull → Edit → Export → Publish → Archive
 
 ```sh
 # Clone the workflow repo
-git clone https://github.com/YOUR_USERNAME/photo-os ~/photo-os
+git clone https://github.com/henry-wu-1130/photo-os ~/photo-os
 
 # Install the photo CLI
 ln -sf ~/photo-os/scripts/photo /usr/local/bin/photo
 
-# Create your first session
-photo new "2025-06-15 Tokyo Street"
-
-# Import from memory card
+# Import from memory card (prompts for project name, sets current session)
 photo import /Volumes/MEMORY_CARD
+
+# Check current session paths
+photo current
+
+# Get the export path to paste into darktable
+photo export-path
+
+# Open exported JPEGs in Finder
+photo open export
 ```
 
 ---

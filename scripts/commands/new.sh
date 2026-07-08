@@ -40,4 +40,7 @@ cmd_new() {
         cp "$notes_src" "$notes_dest"
         log_ok "Notes:     $notes_dest"
     fi
+
+    session_save "$session"
+    log_ok "Current:   $session"
 }

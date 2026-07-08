@@ -11,15 +11,23 @@ Install: `ln -sf ~/photo-os/scripts/photo /usr/local/bin/photo`
 ```
 photo <command> [arguments]
 
-Commands:
-  new      Create a new shoot session folder
-  import   Import RAW files from memory card
-  export   Export edited images to JPEG
-  backup   Sync library to backup destinations
-  review   Open an export folder in Finder
-  status   Show library summary
-  help     Show this help message
+Session commands:
+  new          Create a new session folder structure; sets current session
+  import       Import RAW files from memory card; sets current session
+  current      Show paths for the current session
+  open         Open a session folder in Finder
+  export-path  Print the web export path (paste into darktable)
+
+Library commands:
+  export       Export edited images via darktable-cli (v0.3)
+  backup       Sync library to backup destinations
+  status       Show library summary
+  help         Show this help message
 ```
+
+### Current Session
+
+After `photo import` or `photo new`, the session name is written to `~/.photo-os/current-session`. All session-aware commands read from this file automatically — you never need to type the session name again.
 
 ---
 
@@ -27,22 +35,22 @@ Commands:
 
 ### `photo new`
 
-**Purpose:** Create a new session folder under `RAW/YYYY/`.
+**Purpose:** Create the full session folder structure and set it as current.
 
 **Usage:**
 ```sh
-photo new "2025-06-15 Tokyo Street"
+photo new "2026-07-08 Taipei Blue Hour"
 ```
 
 **What it does:**
-1. Parses date from session name.
-2. Creates `$PHOTO_ROOT/RAW/YYYY/YYYY-MM-DD Location Theme/`.
-3. Prints the full path.
-
-**Design notes:**
-- Session name is quoted string with format `YYYY-MM-DD Location Theme`.
-- Fails with a clear error if the folder already exists.
-- Does not import files — only creates the directory.
+1. Validates format (`YYYY-MM-DD Project`).
+2. Creates all four session directories (idempotent):
+   - `RAW/YYYY/<session>/`
+   - `Export/<session>/web/`
+   - `Export/<session>/print/`
+   - `Portfolio/<session>/`
+3. Copies `templates/session-notes.md` into the RAW folder if not already present.
+4. Saves session as current (`~/.photo-os/current-session`).
 
 ---
 
@@ -147,19 +155,71 @@ photo backup --verify
 
 ---
 
-### `photo review`
+### `photo current`
 
-**Purpose:** Open a session's export folder in Finder for review.
+**Purpose:** Show all paths for the current session.
 
 **Usage:**
 ```sh
-photo review "2025-06-15 Tokyo Street"
-photo review "2025-06-15 Tokyo Street" --preset print
+photo current
 ```
 
-**What it does:**
-1. Resolves the export folder path.
-2. Opens the folder in macOS Finder (`open`).
+**Output example:**
+```
+Session:   2026-07-08 Taipei Blue Hour
+
+RAW:       /Users/henry/Photography/RAW/2026/2026-07-08 Taipei Blue Hour
+Export:    /Users/henry/Photography/Export/2026-07-08 Taipei Blue Hour
+Portfolio: /Users/henry/Photography/Portfolio/2026-07-08 Taipei Blue Hour
+
+Export web path (paste into darktable):
+  /Users/henry/Photography/Export/2026-07-08 Taipei Blue Hour/web
+```
+
+Fails with an error if no session has been set.
+
+---
+
+### `photo open`
+
+**Purpose:** Open a session folder in macOS Finder.
+
+**Usage:**
+```sh
+photo open raw        # RAW/YYYY/<session>/
+photo open export     # Export/<session>/web/
+photo open portfolio  # Portfolio/<session>/
+```
+
+**Notes:**
+- Reads from the current session automatically.
+- Fails if the target folder does not exist.
+- `open export` always opens the `web/` subfolder (most common use case).
+
+---
+
+### `photo export-path`
+
+**Purpose:** Print the current session's web export path. Clean stdout — no prefix or newline decoration — safe for shell substitution and direct copy-paste into darktable.
+
+**Usage:**
+```sh
+photo export-path
+# → /Users/henry/Photography/Export/2026-07-08 Taipei Blue Hour/web
+
+# Shell substitution example:
+darktable-cli input.ARW "$(photo export-path)/output.jpg"
+```
+
+**Notes:**
+- Always prints the `web/` subfolder.
+- Fails if no current session is set.
+
+---
+
+### `photo review`
+
+**Purpose:** *(deprecated — replaced by `photo open export`)* Open a session's export folder in Finder.
 
 ---
 

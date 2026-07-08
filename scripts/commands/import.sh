@@ -84,11 +84,13 @@ cmd_import() {
     # ── Create session if needed ──────────────────────────────────────────────
 
     if [ ! -d "$DEST" ]; then
-        # Source the new command and reuse it so all folders are created consistently
+        # Source the new command and reuse it so all folders are created consistently.
+        # cmd_new also calls session_save, so no need to call it again below.
         . "$CMD_DIR/new.sh"
         cmd_new "$SESSION"
     else
         log_info "Using existing session: $SESSION"
+        session_save "$SESSION"
     fi
 
     # ── Copy files ────────────────────────────────────────────────────────────

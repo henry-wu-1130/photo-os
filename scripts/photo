@@ -32,36 +32,44 @@ COMMAND="${1:-help}"
 shift 2>/dev/null || true
 
 case "$COMMAND" in
-    new)      . "$CMD_DIR/new.sh"    && cmd_new "$@" ;;
-    import)   . "$CMD_DIR/import.sh" && cmd_import "$@" ;;
-    export)   . "$CMD_DIR/export.sh" && cmd_export "$@" ;;
-    backup)   . "$CMD_DIR/backup.sh" && cmd_backup "$@" ;;
-    review)   . "$CMD_DIR/review.sh" && cmd_review "$@" ;;
-    status)   . "$CMD_DIR/status.sh" && cmd_status "$@" ;;
+    new)         . "$CMD_DIR/new.sh"         && cmd_new "$@" ;;
+    import)      . "$CMD_DIR/import.sh"      && cmd_import "$@" ;;
+    export)      . "$CMD_DIR/export.sh"      && cmd_export "$@" ;;
+    backup)      . "$CMD_DIR/backup.sh"      && cmd_backup "$@" ;;
+    current)     . "$CMD_DIR/current.sh"     && cmd_current "$@" ;;
+    open)        . "$CMD_DIR/open.sh"        && cmd_open "$@" ;;
+    export-path) . "$CMD_DIR/export-path.sh" && cmd_export_path "$@" ;;
+    status)      . "$CMD_DIR/status.sh"      && cmd_status "$@" ;;
     help|-h|--help)
         cat <<EOF
 photo - photo-os workflow CLI
 
 Usage: photo <command> [arguments]
 
-Commands:
-  new      <"YYYY-MM-DD Location Theme">   Create a new session folder
-  import   <source_path> [--session NAME]  Import RAW files from memory card
-  export   <"YYYY-MM-DD Location Theme">   Export edited images to JPEG
-  backup   [--dest primary|secondary|all]  Sync library to backup destinations
-  review   <"YYYY-MM-DD Location Theme">   Open export folder in Finder
-  status                                   Show library summary
-  help                                     Show this message
+Session commands:
+  new          <"YYYY-MM-DD Project">        Create a new session folder structure
+  import       <source> [--session NAME]     Import RAW files; sets current session
+  current                                    Show current session paths
+  open         <raw|export|portfolio>        Open a session folder in Finder
+  export-path                                Print web export path (for darktable)
 
-Examples:
-  photo new "2025-06-15 Tokyo Street"
-  photo import /Volumes/MEMORY_CARD
-  photo export "2025-06-15 Tokyo Street" --preset web
-  photo backup
-  photo review "2025-06-15 Tokyo Street"
+Library commands:
+  export       <"YYYY-MM-DD Project">        Export edited images via darktable-cli
+  backup       [--dest primary|secondary]    Sync library to backup destinations
+  status                                     Show library summary
+
+Other:
+  help                                       Show this message
+
+Typical workflow:
+  photo import /Volumes/MEMORY_CARD   # import + set current session
+  photo current                       # show paths
+  photo export-path                   # copy into darktable export field
+  photo open export                   # review exported JPEGs in Finder
+  photo backup                        # sync to backup drive
 
 Config: ~/.photo-os/config
-Docs:   https://github.com/YOUR_USERNAME/photo-os
+Docs:   https://github.com/henry-wu-1130/photo-os
 EOF
         ;;
     *)

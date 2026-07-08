@@ -79,6 +79,36 @@ validate_session() {
     fi
 }
 
+# ─── Current Session ───────────────────────────────────────────────────────
+
+PHOTO_OS_SESSION_FILE="$HOME/.photo-os/current-session"
+
+# Persist a session name as the current session
+session_save() {
+    mkdir -p "$PHOTO_OS_CONFIG_DIR"
+    printf '%s\n' "$1" > "$PHOTO_OS_SESSION_FILE"
+}
+
+# Read the current session name; returns empty string if not set
+session_load() {
+    if [ -f "$PHOTO_OS_SESSION_FILE" ]; then
+        cat "$PHOTO_OS_SESSION_FILE"
+    fi
+}
+
+# Sets CURRENT_SESSION to the active session name, or exits with an error.
+# Call directly (not inside $()) to avoid subshell exit-propagation issues.
+#
+#   session_require
+#   echo "$CURRENT_SESSION"
+session_require() {
+    CURRENT_SESSION="$(session_load)"
+    if [ -z "$CURRENT_SESSION" ]; then
+        log_error "No current session. Run 'photo import' or 'photo new' first."
+        exit 1
+    fi
+}
+
 # ─── System Checks ─────────────────────────────────────────────────────────
 
 require_cmd() {
